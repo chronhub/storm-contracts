@@ -12,6 +12,10 @@ namespace Storm\Contracts\Chronicler;
  * the FQCN so it survives class renames; event_store.event_version carries the schema version,
  * which drives upcasting on read. An event declares both the alias and the version via the
  * EventType attribute; a class without it falls back to its FQCN at version 1.
+ *
+ * Alias stability covers type resolution. It does not preserve a payload codec's cryptographic
+ * context: personal `v2` envelopes also bind the original PHP class and payload key, which this
+ * mapper neither records nor migrates.
  */
 interface EventTypeMapper
 {
