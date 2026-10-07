@@ -34,6 +34,7 @@ the directory IS the fine-grained map:
 - `Message/` — the event taxonomy (`DomainEvent`, `SerializablePayload`), the header SPI, and the
   dual-write-guard exemption marker;
 - `Projector/` — the post-commit hook and read-your-writes freshness;
+- `Random/` — the jitter a backoff draws its spread from;
 - `Serializer/` — the serialization failure and the crypto-shredding key seam;
 - `Stream/` — stream validity.
 

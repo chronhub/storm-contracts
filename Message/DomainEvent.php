@@ -19,7 +19,11 @@ namespace Storm\Contracts\Message;
 interface DomainEvent extends SerializablePayload
 {
     /**
-     * The id of the aggregate this event belongs to.
+     * The id of the aggregate this event belongs to, in the form the store speaks.
+     *
+     * A coordinate rather than a degraded identity: it names a stream and keys a row, so it carries
+     * no parse and no identity class. A consumer needing the typed identity builds it at its own
+     * boundary, where the concrete class is known and a malformed value has somewhere to fail.
      */
     public function aggregateId(): string;
 }
