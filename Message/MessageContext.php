@@ -7,15 +7,16 @@ namespace Storm\Contracts\Message;
 /**
  * The cross-cutting context of the message currently being handled.
  *
- * This is a deliberately tiny, framework-neutral view of who or what caused the work in flight:
- * correlation, causation, actor, and tenant identifiers, plus the declared transverse bag. It
- * exists so that components on the write path, chiefly the aggregate repository, can stamp newly
- * recorded events with the current context without depending on the transport, Symfony Messenger.
+ * A small, framework-neutral view of who or what caused the work in flight:
  *
- * The runtime carrier of this context is Messenger stamps, but a single middleware in the Story
- * package binds those stamps into a neutral implementation; nothing outside that middleware ever
- * reads a stamp. The event store and projectors only ever see this neutral contract and the
- * Message.
+ * - The correlation, causation, actor and tenant identifiers
+ * - The declared transverse bag
+ *
+ * Components on the write path, chiefly the aggregate repository, stamp newly recorded events with
+ * it without depending on Symfony Messenger. At runtime the context travels as Messenger stamps,
+ * and a single middleware in the Story package binds them into a neutral implementation; nothing
+ * else reads a stamp, so the event store and the projectors see only this contract and the
+ * `Message`.
  *
  * @see \Storm\Message\Message
  */
@@ -47,15 +48,18 @@ interface MessageContext
     public function tenantId(): ?string;
 
     /**
-     * The declared transverse bag: opaque key/value metadata that propagates along the causal
-     * chain exactly like the fixed identifiers above, and that the framework itself never reads.
+     * The declared transverse bag of opaque key/value metadata.
      *
-     * Keys are application header keys, the `__` prefix staying reserved for framework headers;
-     * values are JSON-friendly scalars. Which keys propagate across hops is DECLARED wiring under
-     * `storm.context.propagated_keys`, never an open floodgate: an undeclared header stays a
-     * one-message annotation. Domain data never belongs here; a downstream fact or decision that
-     * branches on a value makes it payload. The bag is not covered by crypto-shredding, so personal
-     * data is forbidden in it.
+     * It propagates along the causal chain like the identifiers above, and the framework never reads
+     * it.
+     *
+     * - Keys are application header keys; the `__` prefix stays reserved for framework headers
+     * - Values are JSON-friendly scalars
+     * - Only the keys declared under `storm.context.propagated_keys` cross hops; an undeclared
+     *   header annotates one message only
+     *
+     * Domain data never belongs here: a value a downstream fact or decision branches on is payload.
+     * Crypto-shredding does not cover the bag, so personal data is forbidden in it.
      *
      * @return array<string, bool|float|int|string>
      */

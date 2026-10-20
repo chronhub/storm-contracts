@@ -16,18 +16,18 @@ use function sprintf;
 use function str_contains;
 
 /**
- * The executable form of the package README's rule 1: zero `use Storm\<module>` import in
- * Contracts, even for a `@see`. A docblock-only import is invisible to deptrac, which does not
- * count use-only references, so the rule needs its own tripwire and this test is it.
+ * Checks the package README's rule 1, no `use Storm\<module>` import in Contracts, and rule 3 on the
+ * throws clauses of its ports.
  *
- * Pint's `fully_qualified_strict_types` fixer would otherwise re-import such symbols straight
- * from fully-qualified `@see` tags, reproducing the very violation the rule forbids; it is
- * neutralized in `pint.json` with `phpdoc_tags: []`, which keeps the fixer's code-level value
- * while removing its docblock reach. This test fails if that config ever regresses.
+ * Rule 1 holds even for an `@see`. Deptrac does not count use-only references, so a
+ * docblock-only import escapes it and this test catches it instead. Pint's
+ * `fully_qualified_strict_types` fixer would re-import such symbols from fully-qualified `@see`
+ * tags; `pint.json` neutralizes it with `phpdoc_tags: []`, which keeps its code-level fixes, and
+ * this test fails if that setting regresses.
  *
- * A cross-reference to a concrete belongs in the docblock as a fully-qualified `@see \Storm\...`,
- * never as an import: at subtree-split time `chronhub/storm-contracts` must not reference classes
- * outside its own dependency set.
+ * A cross-reference to a concrete class goes in the docblock as a fully-qualified tag, such as
+ * `@see \Storm\...`, never as an import: after the subtree split, `chronhub/storm-contracts` must not
+ * reference classes outside its own dependencies.
  */
 final class ContractsPurityTest extends TestCase
 {
@@ -57,9 +57,8 @@ final class ContractsPurityTest extends TestCase
     #[Test]
     public function every_fully_qualified_doc_reference_resolves(): void
     {
-        // the flip side of the purity rule: the prescribed form, a fully-qualified `\Storm\...` in
-        // the docblock, is deptrac-invisible AND build-invisible, so a rename rots it silently;
-        // this walk makes each such reference cost what an import would have cost, a red build
+        // a fully-qualified `\Storm\...` doc reference is invisible to deptrac and to the build, so a
+        // rename breaks it silently; this walk turns each one into a red build, as an import would
         $offenders = [];
 
         foreach (self::sourceFiles() as $file) {
@@ -85,8 +84,8 @@ final class ContractsPurityTest extends TestCase
     #[Test]
     public function contracted_throws_never_name_a_concrete_module_type(): void
     {
-        // the second half of the README's rule 3: a port's @throws names the CONTRACTED type; a
-        // concrete module class slipping in would hand callers a catch target the split cannot see
+        // the README's rule 3, second half: a port's @throws names the contracted type, since a
+        // concrete module class would give callers a catch target the split cannot see
         $offenders = [];
 
         foreach (self::sourceFiles() as $file) {
@@ -98,6 +97,24 @@ final class ContractsPurityTest extends TestCase
         }
 
         $this->assertSame([], $offenders, "A Contracts port's @throws must name a Contracts type, never a concrete module class:\n".implode("\n", $offenders));
+    }
+
+    #[Test]
+    public function contracted_throws_never_declare_a_throwable_tail(): void
+    {
+        // the README's rule 3, applied to driver failures: a tail grants the caller no exhaustiveness,
+        // so the implementation translates its driver failure into a contracted type before it crosses
+        $offenders = [];
+
+        foreach (self::sourceFiles() as $file) {
+            foreach (file($file->getPathname()) ?: [] as $line => $content) {
+                if (preg_match('#@throws\s+(?:[\w\\\\]+\|)*\\\\?Throwable(?![\w\\\\])#', $content) === 1) {
+                    $offenders[] = sprintf('%s:%d %s', $file->getFilename(), $line + 1, trim($content));
+                }
+            }
+        }
+
+        $this->assertSame([], $offenders, "A Contracts port's @throws must name a contracted type, never a Throwable tail:\n".implode("\n", $offenders));
     }
 
     /**

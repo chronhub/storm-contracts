@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Storm\Contracts\Message;
 
 /**
- * A type-safe key for a Message header.
+ * A type-safe key for a `Message` header.
  *
- * The framework ships its own keys as the Header enum, but applications extend the header space
- * simply by declaring their own backed enum that implements this interface, with no registry and
- * no central registration:
+ * The framework ships its own keys as the `Header` enum. An application adds its own by declaring a
+ * backed enum that implements this interface, with no registry:
  *
  * ```php
  * enum OrderHeader: string implements HeaderKey
@@ -23,7 +22,7 @@ namespace Storm\Contracts\Message;
  * }
  * ```
  *
- * Convention: the __ prefix is reserved for framework keys; application keys must not use it.
+ * The `__` prefix is reserved for framework keys; application keys never use it.
  *
  * @see \Storm\Message\Message
  */

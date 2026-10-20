@@ -7,16 +7,21 @@ namespace Storm\Contracts\Chronicler;
 /**
  * A stored row this runtime cannot turn back into a message.
  *
- * The classification a relay and a transport both need, and the one neither can make from the
- * exception's TYPE alone: what separates a row to park from a row to freeze is not what went wrong,
- * it is whether a DIFFERENT binary would succeed. A missing version step, two upcasters wired onto
- * one, an upcaster whose own code throws, a row written by a newer release: all of them decode
- * elsewhere, so parking them demands a manual requeue for a fault the next deployment already fixed,
- * and breaks their aggregate's order meanwhile.
+ * A relay and a transport both decide whether to park such a row or to freeze it, and the
+ * exception's type alone cannot tell them: the answer is whether a different binary would decode
+ * it. These rows decode elsewhere:
  *
- * `resolvableByAnotherRuntime()` carries the answer per instance rather than per class, because one
- * cause genuinely straddles: an unresolved type alias reads as a rollout when the alias is simply not
- * declared here, and as poison when it resolves to something that is not a domain event.
+ * - A missing version step
+ * - Two upcasters wired onto one version step
+ * - An upcaster whose own code throws
+ * - A row written by a newer release
+ *
+ * Parking them would demand a manual requeue for a fault the next deployment already fixed, and
+ * break their aggregate's order meanwhile.
+ *
+ * `resolvableByAnotherRuntime()` answers per instance rather than per class, because one cause falls
+ * on both sides: an unresolved type alias is a rollout when the alias is simply not declared here,
+ * and poison when it resolves to something that is not a domain event.
  *
  * @see ChroniclerExceptionContract the root every contracted Chronicler failure implements
  */

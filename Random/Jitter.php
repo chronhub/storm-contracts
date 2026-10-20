@@ -7,8 +7,10 @@ namespace Storm\Contracts\Random;
 use Random\RandomException;
 
 /**
- * The draw a backoff spreads its retries with, so the range a caller asks for and the end it gets
- * stay observable, where an inline call to the random source would leave them to chance.
+ * The random draw a backoff spreads its retries with.
+ *
+ * Behind this port, the range a caller asks for and the value it gets stay observable; an inline
+ * call to the random source would leave them to chance.
  */
 interface Jitter
 {

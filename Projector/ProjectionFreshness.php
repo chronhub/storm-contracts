@@ -8,17 +8,18 @@ use Storm\Contracts\Chronicler\Position;
 use Storm\Contracts\Chronicler\StorageFailure;
 
 /**
- * Read-your-writes freshness and readiness of a projection, as a consumer sees it: has the
- * projection caught up to a position or to the current head, how far behind is it, and the
- * bounded waits over those probes. The port an edge consumes without ever knowing the projector
- * machinery, for example:
+ * Read-your-writes freshness and readiness of a projection, as a consumer sees them.
+ *
+ * It answers whether the projection caught up to a position or to the current head and how far
+ * behind it is, with bounded waits over those probes. An edge consumes it without knowing the
+ * projector, for example:
  *
  * - An HTTP bridge serving fresh or returning 202
  * - A readiness probe
  * - A blue/green swap signal
  *
- * Not-fresh is an ANSWER, the boolean `false`, never an exception: the caller decides what
- * staleness means. Every probe is non-locking; the projection advances in its own daemon/run.
+ * A stale projection answers `false` rather than throwing, and the caller decides what staleness
+ * means. Every probe is non-locking; the projection advances in its own daemon or run.
  */
 interface ProjectionFreshness
 {
@@ -40,18 +41,20 @@ interface ProjectionFreshness
     public function waitFor(string $name, Position $token, float $timeoutSeconds = 5.0, int $pollMs = 50): bool;
 
     /**
-     * Has the projection's checkpoint reached the current safe head? An empty store is
-     * trivially at head.
+     * Has the projection's checkpoint reached the current safe head?
+     *
+     * An empty store is trivially at head.
      *
      * @throws StorageFailure when the safe-head or checkpoint read fails at the storage level
      */
     public function isAtHead(string $name): bool;
 
     /**
-     * Wait until the projection has caught up to the head or the timeout elapses. The GUARANTEE is
-     * "caught up as of the request", which covers every write committed before the wait began, so the
-     * writer needs no token; HOW the head is resolved is the implementation's business, and freezing
-     * it for the wait satisfies the same guarantee, a head only ever moving up.
+     * Wait until the projection has caught up to the head or the timeout elapses.
+     *
+     * The guarantee is "caught up as of the request": every write committed before the wait began
+     * is covered, so the writer needs no token. The implementation chooses how to resolve the head,
+     * and freezing it for the wait gives the same guarantee, since a head only moves up.
      *
      * @param  float  $timeoutSeconds  max time to wait; `0` runs a single `isAtHead()` poll
      * @param  positive-int  $pollMs  sleep between polls
@@ -61,8 +64,9 @@ interface ProjectionFreshness
     public function waitForHead(string $name, float $timeoutSeconds = 5.0, int $pollMs = 50): bool;
 
     /**
-     * Positions the projection is behind the current safe head; 0 means caught up. A
-     * point-in-time read: the head moves, and for a daemon it tends toward 0.
+     * Positions the projection is behind the current safe head; 0 means caught up.
+     *
+     * A point-in-time read: the head moves, and for a daemon it tends toward 0.
      *
      * @throws StorageFailure when the safe-head or checkpoint read fails at the storage level
      */

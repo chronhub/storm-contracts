@@ -71,8 +71,12 @@ reason, and moved back.
 **3. Ports own their exception AS A TYPE.** Each contracted failure is an empty interface here
 (`extends Throwable`); the owning module's hierarchy implements it while keeping its SPL base (the
 intent axis: RuntimeException = runtime condition, InvalidArgumentException/LogicException = bug).
-A port's `@throws` names the contracted type; callers catch domain failures without knowing the
-implementing package. These interfaces sit in this layer *because* the ports here name them in
+A port declared here names the contracted type in its `@throws`, never a `Throwable` tail; callers
+catch domain failures without knowing the implementing package, and an implementation translates its
+driver failure before it crosses, as `DbalIdempotencyRegistry` wraps a DBAL failure into
+`StorageFailure`. A module-local port keeps its tail when the translation belongs to the consuming
+frontier: `DecisionAppend` and `FactAppend` let the raw driver failure reach the write chain's retry,
+which matches it by pattern. These interfaces sit in this layer *because* the ports here name them in
 `@throws` — same-layer references pin them. Bugs (LogicException-class) are deliberately NOT
 contracted: declaring a bug invites catching it. — Exception to the idiom: a module whose ports are
 all module-local (Saga) owns its failure as a local concrete class (`SagaStorageFailure`); hoisting
@@ -89,7 +93,11 @@ failure in a module is the trigger to introduce a `<Module>ExceptionContract` ro
 both. `Chronicler` / `Aggregate` show the shape: the root is the OUTER catch net (`catch
 (ChroniclerExceptionContract)` = any port failure, log/dead-letter it), the specific child is the
 INNER catch for a precise reaction (`ConcurrencyException` for the bounded write-retry, never the
-umbrella — which would also swallow the unrecoverable `StorageFailure`).
+umbrella — which would also swallow the unrecoverable `StorageFailure`). `Serializer/SubjectForgotten`
+does not count as the codec's second failure: it is the one refusal of the `CipherKeyStore` port,
+which the codec re-exposes on its write path as `FactAppend` does. It stands beside
+`SerializationExceptionContract` with no shared root, since a root would put a compliance refusal,
+which must bubble, under the outer net a caller logs or dead-letters.
 
 ## Resources
 

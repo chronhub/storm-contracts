@@ -9,9 +9,9 @@ use Stringable;
 /**
  * The typed identity of an aggregate root.
  *
- * Applications declare their own, for example OrderId, usually via the ProvideAggregateIdentity
- * trait, so identities are type-safe across the domain. Always Stringable: its string form is the
- * aggregate id stamped on events and used in the stream name.
+ * Applications declare their own, such as `OrderId`, usually through the `ProvideAggregateIdentity`
+ * trait, so identities stay type-safe across the domain. The string form is the aggregate id
+ * stamped on events and used in the stream name.
  */
 interface AggregateIdentity extends Stringable
 {
@@ -28,15 +28,18 @@ interface AggregateIdentity extends Stringable
     public static function generate(): static;
 
     /**
-     * Value equality, same concrete type and same value. A foreign identity, another concrete of
-     * this interface, answers false and never throws: the signature admits the whole family, so
-     * equality is a question here, not the assertion the repository makes with its typed refusal.
+     * Value equality: same concrete type and same value.
+     *
+     * Another concrete of this interface answers false and never throws, since the signature
+     * admits the whole family. The repository, by contrast, refuses a foreign identity with a typed
+     * error.
      */
     public function equals(self $other): bool;
 
     /**
-     * The identity's canonical string form; `__toString()` renders the same value, the explicit
-     * method being the greppable, pipeline-friendly twin.
+     * The canonical string form, the value `__toString()` also renders.
+     *
+     * The named method can be searched for and passed as a callable.
      */
     public function toString(): string;
 }

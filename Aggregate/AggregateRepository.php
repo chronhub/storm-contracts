@@ -13,15 +13,15 @@ use Storm\Contracts\Stream\InvalidStreamException;
 /**
  * Persists and reconstitutes aggregate roots through the event store.
  *
- * The repository's currency is the per-aggregate version under optimistic concurrency; the global
- * read-your-writes Position is an outbox or projection concern and is not surfaced here. One
- * repository instance is bound to a single aggregate type and stream category.
+ * One instance is bound to a single aggregate type and stream category. It works with the
+ * per-aggregate version under optimistic concurrency; the global read-your-writes `Position`
+ * belongs to the outbox and the projections and is not exposed here.
  *
- * Generic over the bound identity type TId and aggregate type T: AggregateRepositoryManager binds
- * a repository to a concrete aggregate type, so its retrieve() is typed as ?T and callers skip the
- * instanceof narrowing, only null-checking for the not-found case. PHPStan further refuses a
- * foreign identity at the call site, the static mirror of the runtime id-class guard every
- * implementation keeps on both store() and retrieve().
+ * `TId` and `T` are the bound identity and aggregate types. `AggregateRepositoryManager` binds a
+ * repository to a concrete aggregate type, so `retrieve()` returns `?T`: callers skip the
+ * `instanceof` narrowing and only check for null. PHPStan also refuses a foreign identity at the
+ * call site, the static counterpart of the runtime id-class guard every implementation keeps on
+ * `store()` and `retrieve()`.
  *
  * @template TId of AggregateIdentity
  * @template T of AggregateRoot<TId>
@@ -31,42 +31,36 @@ interface AggregateRepository
     /**
      * Persist the aggregate's newly recorded events under optimistic concurrency.
      *
-     * On a concurrency conflict, when the stream moved past the aggregate's loaded version because a
-     * competing writer won, the implementation throws the contracted ConcurrencyException. Whether
-     * the conflict is worth retrying is carried by its RetryableConcurrencyConflict marker: a marked
-     * conflict is won by reload-and-redecide; an unmarked one is terminal, since the decision may
-     * already be applied and must not be blind-retried.
+     * When a competing writer moved the stream past the loaded version, the conflict is a
+     * `ConcurrencyException`. Its `RetryableConcurrencyConflict` marker says whether reloading and
+     * deciding again can win; an unmarked conflict is terminal, since the decision may already be
+     * applied, and is never retried blindly.
      *
-     * Single-shot per decision. A store() that THREW leaves the instance spent: its event buffer
-     * was drained and its version stays advanced, so retrying store() on the same instance is a
-     * silent no-op that persists nothing. Recovery is reload-and-re-decide, where the framework's
-     * own redelivery re-runs the handler on a fresh retrieve, never a second store() of the instance.
+     * A call is single-shot per decision. After a failed `store()` the instance is spent: its event
+     * buffer is drained and its version stays advanced, so a second `store()` silently persists
+     * nothing. Recovery reloads and decides again, which the framework's redelivery does on a fresh
+     * `retrieve()`.
      *
      * @param  T  $aggregate
      *
      * @throws ConcurrencyException on a concurrency conflict
      * @throws AggregateTypeMismatch when the aggregate's identity is not this repository's id type
-     * @throws EventAggregateIdMismatch when a released event's own aggregateId() contradicts the
-     *                                  identity being stored, a domain bug surfaced at the write and
-     *                                  not persisted as an incoherent fact
+     * @throws EventAggregateIdMismatch when a released event's own `aggregateId()` contradicts the
+     *                                  identity being stored, a domain bug refused at the write
+     *                                  before it becomes an incoherent fact
      * @throws InvalidStreamException when the aggregate id does not form a valid stream qualifier
      * @throws SubjectForgotten when a personal payload names a tombstoned subject: no key can be
-     *                          issued for it, so the write refuses rather than storing in clear
-     * @throws StorageFailure on a write-side infrastructure failure, cause preserved: the
-     *                        transactional append, translated at this port AFTER the write chain's
-     *                        own transient retry gave up, so the raw driver failure stays below the
-     *                        retry where it is pattern-matched; the mirror of the retrieve()
-     *                        translation
+     *                          issued for it, so the write refuses instead of storing in clear
+     * @throws StorageFailure on a write-side infrastructure failure, cause preserved: a driver error,
+     *                        or an event the codec refuses to write, such as a personal event
+     *                        without its subject key or a payload that will not encode. The append is
+     *                        translated here after the write chain's own transient retry gave up,
+     *                        so that retry still matches the raw driver failure, as in `retrieve()`
      */
     public function store(AggregateRoot $aggregate): void;
 
     /**
-     * Reconstitute the aggregate from its event history or null when no stream exists.
-     *
-     * Reads and deserializes the stream. Infra failures of the read, such as a driver error, a
-     * corrupt stored row, or a stream row that is not a domain event, cross this port as the
-     * contracted StorageFailure with cause preserved. The replay's own corruption,
-     * CorruptAggregateHistory, and an unknown stored event type surface distinctly.
+     * Reconstitute the aggregate from its event history, or null when no stream exists.
      *
      * @param  TId  $id
      * @return T|null
@@ -74,11 +68,12 @@ interface AggregateRepository
      * @throws AggregateTypeMismatch when the given identity is not this repository's id type
      * @throws InvalidStreamException when the aggregate id does not form a valid stream qualifier
      * @throws UnknownEventType when the stored event type is unknown
-     * @throws StorageFailure on a read-side infrastructure failure: the store read, its
-     *                        deserialization, a stream row that is not a domain event, or the read
-     *                        path of an implementation's acceleration cache such as the snapshot
-     *                        store; a failing cache crosses as this failure, never as a silent miss
-     * @throws CorruptAggregateHistory when a reconstituted history contradicts its own version headers, in either direction
+     * @throws StorageFailure on a read-side infrastructure failure, cause preserved: a driver error,
+     *                        a corrupt stored row, a stream row that is not a domain event, or the
+     *                        read path of an acceleration cache such as the snapshot store, which
+     *                        fails as this error rather than as a silent miss
+     * @throws CorruptAggregateHistory when a reconstituted history contradicts its own version headers, in
+     *                                 either direction
      */
     public function retrieve(AggregateIdentity $id): ?AggregateRoot;
 }

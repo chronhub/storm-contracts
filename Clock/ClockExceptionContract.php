@@ -7,8 +7,10 @@ namespace Storm\Contracts\Clock;
 use Throwable;
 
 /**
- * The contracted failure of the Clock port: any clock error, in practice a datetime the clock
- * rejects as unparseable or not the canonical UTC RFC 3339 shape with microsecond precision.
+ * Any failure of the `Clock` port.
+ *
+ * In practice, a datetime the clock rejects as unparseable or as outside the canonical shape:
+ * RFC 3339, UTC, microsecond precision.
  *
  * @see Clock
  */

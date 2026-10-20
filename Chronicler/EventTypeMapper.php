@@ -4,56 +4,27 @@ declare(strict_types=1);
 
 namespace Storm\Contracts\Chronicler;
 
+use Storm\Contracts\Message\MessageTypeMapper;
+
 /**
- * Maps a domain event's PHP class to and from its stable stored type and exposes its current
- * schema version.
+ * The `MessageTypeMapper` with the schema version that drives upcasting, one map for events and
+ * commands alike.
  *
- * The event_store.type column carries a stable alias, for example, 'order.placed', decoupled from
- * the FQCN so it survives class renames; event_store.event_version carries the schema version,
- * which drives upcasting on read. An event declares both the alias and the version via the
- * EventType attribute; a class without it falls back to its FQCN at version 1.
+ * `event_store.type` holds the alias and `event_store.event_version` the schema version applied on
+ * read. An event declares both through the `EventType` attribute, a command its alias alone through
+ * `CommandType`, and a class without either falls back to its FQCN at version 1.
  *
- * Alias stability covers type resolution. It does not preserve a payload codec's cryptographic
- * context: personal `v2` envelopes also bind the original PHP class and payload key, which this
- * mapper neither records nor migrates.
+ * Alias stability covers type resolution only. A payload codec's cryptographic context is its own:
+ * a personal `v3` envelope binds the alias its row stores, but a `v2` envelope binds the original
+ * PHP class and payload key, which this mapper neither records nor migrates.
  */
-interface EventTypeMapper
+interface EventTypeMapper extends MessageTypeMapper
 {
-    /**
-     * Maps a class FQCN to its stored event type alias.
-     */
-    public function toType(string $class): string;
-
-    /**
-     * Maps a stored event type alias back to its current class FQCN.
-     *
-     * @return class-string
-     *
-     * @throws UnknownEventType when the stored type resolves to no known class
-     */
-    public function toClass(string $type): string;
-
     /**
      * Maps a class FQCN to its current schema version, or 1 when none is declared.
      *
+     * @param  class-string  $class
      * @return positive-int
      */
     public function versionOf(string $class): int;
-
-    /**
-     * Every stored type a class may appear as in the event store.
-     *
-     * Returns, for the given class FQCN:
-     *
-     * - Its current alias
-     * - Any replaced aliases
-     * - The FQCN itself, matching rows written before the alias existed
-     *
-     * This lets a consumer filter the store by event class and still match rows whatever form each
-     * was stored as, so a type filter keeps working after an event gains or renames an EventType
-     * alias. A class without an EventType attribute resolves to just its FQCN.
-     *
-     * @return list<string>
-     */
-    public function storedTypesOf(string $class): array;
 }

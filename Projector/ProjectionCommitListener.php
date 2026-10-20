@@ -5,22 +5,25 @@ declare(strict_types=1);
 namespace Storm\Contracts\Projector;
 
 /**
- * Post-commit hook of a projection batch: fired by the runner AFTER the batch transaction
- * committed and only when the batch applied at least one record.
+ * Post-commit hook of a projection batch.
  *
- * That is the moment a read model visibly changed, the only correct moment to invalidate
- * whatever was derived from it: an HTTP cache purge, a websocket nudge, a metrics tick.
+ * The runner fires it after the batch transaction committed, and only when the batch applied at
+ * least one record. That is when a read model visibly changed, the one moment to invalidate what
+ * was derived from it:
  *
- * The contract is strictly fire-and-forget: an implementation MUST NOT throw. A failing
- * side-channel, such as a purger being down, must never fail the projection; degrade and log
- * inside the implementation. The RUNNER enforces the clause regardless: it owns the invariant,
- * so a listener that throws anyway is absorbed and surfaced through observability, never through
- * the run's outcome. The implementation's discipline is redundant defense, not the only barrier.
- * Called inside the run loop, so keep it fast or hand off.
+ * - An HTTP cache purge
+ * - A websocket nudge
+ * - A metrics tick
  *
- * Implementations are COLLECTED, never a single slot: under the bundle every service implementing
- * this interface is tagged and the injected port resolves to a composite fan-out, so a second
- * listener never evicts the first; a runner wired without the bundle keeps its Null default.
+ * An implementation never throws: a failing side channel, such as a purger being down, must not
+ * fail the projection, so it degrades and logs internally. The runner owns that invariant anyway: it
+ * absorbs a listener that throws and reports it through observability, never through the run's
+ * outcome, so the implementation's own discipline is a second barrier. The hook runs inside the run
+ * loop, so it stays fast or hands off.
+ *
+ * Under the bundle, every service implementing this interface is tagged and the injected port
+ * resolves to a composite fan-out, so a second listener never evicts the first. A runner wired
+ * without the bundle keeps its null default.
  */
 interface ProjectionCommitListener
 {

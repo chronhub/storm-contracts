@@ -8,15 +8,13 @@ use Generator;
 use Storm\Contracts\Message\DomainEvent;
 
 /**
- * An AggregateRoot that supports snapshot-accelerated reconstruction.
+ * An aggregate root the repository can rebuild from a snapshot.
  *
- * A snapshot is a cache of the aggregate's state at a version, never the source of truth; the
- * events stay authoritative. Implementing this lets the repository load the latest snapshot and
- * replay only the events recorded after it, instead of the whole history.
+ * A snapshot caches the aggregate's state at a version, and the events stay authoritative. The
+ * repository loads the latest snapshot and replays only the events recorded after it.
  *
- * Kept pure: it names no Snapshot DTO or infrastructure type, so the domain only ever deals with
- * the state array and the integer version; the persistence envelope is unpacked at the infra
- * boundary.
+ * The interface names no snapshot DTO or infrastructure type: the domain deals with the state array
+ * and the integer version, and the persistence envelope is unpacked at the infrastructure boundary.
  *
  * @template-covariant TId of AggregateIdentity
  *
@@ -25,17 +23,19 @@ use Storm\Contracts\Message\DomainEvent;
 interface SnapshotableAggregateRoot extends AggregateRoot
 {
     /**
-     * The state-array key carrying the snapshot's shape version, written by `toSnapshot()` and read
-     * back by `fromSnapshot()`. One spelling for every writer: a typo'd key would silently mean
-     * shape 1 forever, restoring stale-shape rows instead of discarding them.
+     * The state-array key of the snapshot's shape version.
+     *
+     * `toSnapshot()` writes it and `fromSnapshot()` reads it. Every writer uses this one spelling: a
+     * mistyped key would read as shape 1 forever, restoring stale-shape rows instead of ignoring
+     * them.
      */
     public const string SNAPSHOT_VERSION_KEY = '_snapshot_version';
 
     /**
-     * Export the complete state needed to reconstruct the aggregate, as a plain array.
+     * Export the complete state needed to rebuild the aggregate.
      *
-     * Include everything fromSnapshot needs plus the shape-version marker under
-     * `SNAPSHOT_VERSION_KEY`; exclude unreleased events and derived or transient data.
+     * It holds everything `fromSnapshot()` needs plus the shape version under `SNAPSHOT_VERSION_KEY`,
+     * and leaves out unreleased events and derived or transient data.
      *
      * @return array<string, mixed>
      */
@@ -44,20 +44,20 @@ interface SnapshotableAggregateRoot extends AggregateRoot
     /**
      * Rebuild from a stored state, then replay the events recorded after the snapshot.
      *
-     * Returns null when the snapshot is incompatible, its `SNAPSHOT_VERSION_KEY` no longer matching
-     * the current shape, so the caller reconstitutes from the full event history instead. The after
-     * generator's return value is the aggregate's true current version, provided by the repository.
+     * Returns null when `SNAPSHOT_VERSION_KEY` no longer matches the current shape, so the caller
+     * reconstitutes from the full history instead.
      *
      * @param  array<string, mixed>  $state  the array returned by `toSnapshot()`
      * @param  int  $version  the version the snapshot was taken at
-     * @param  Generator<int, DomainEvent, null, int>  $after  events with version greater than the
-     *                                                         snapshot version; the return value is
-     *                                                         the aggregate's true current version
+     * @param  Generator<int, DomainEvent, null, int>  $after  events with a version above the
+     *                                                         snapshot's; the return value is the
+     *                                                         aggregate's current version, provided
+     *                                                         by the repository
      *
-     * @throws InvalidSnapshotState when the stored state is semantically unusable; the snapshot
-     *                              repository converts it into a cache miss and replays the full
-     *                              authoritative history
-     * @throws CorruptAggregateHistory when the replayed tail contradicts the snapshot version plus its applied count
+     * @throws InvalidSnapshotState when the stored state is unusable; the snapshot repository turns
+     *                              it into a cache miss and replays the full history
+     * @throws CorruptAggregateHistory when the replayed tail contradicts the snapshot version plus its
+     *                                 applied count
      */
     public static function fromSnapshot(AggregateIdentity $aggregateId, array $state, int $version, Generator $after): ?static;
 }
